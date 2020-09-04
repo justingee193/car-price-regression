@@ -1,5 +1,5 @@
 ---
-title: "Car Price"
+title: "Car Price Regression"
 author: "*Justin Gee*"
 output:
   rmdformats::readthedown:
@@ -211,7 +211,9 @@ $R^2$ is defined as:
   + $SS_R = \sum_{i}{(y_i - \hat{y_i})^2} = \sum_i{e_i^2}$ = Residual Sum of Squares
   + $SS_T = \sum_{i}{(y_i - \bar{y})^2}$ = Total Sum of Squares
 
-$R^2$ is the proportion of the variance in the dependent variable that is predictable from the independent variable. As residuals become smaller, the more accurate the model becomes. When using $R^2$ we want to achieve a value closest to 1.
+$R^2$ is the proportion of the variance in the dependent variable that is predictable from the 
+independent variable. As residuals become smaller, the more accurate the model becomes. When 
+using $R^2$ we want to achieve a value closest to 1.
 
 ## Notes
 Linear Regression:
@@ -222,7 +224,8 @@ Linear Regression:
   + $\beta_0$ = intercept
   + $x$ = dependent variable
   
-In order to solve for $\beta$ we use Ordinary Least Squares, where the squared distance between the true value and regression line are minimized.
+In order to solve for $\beta$ we use Ordinary Least Squares, where the squared distance between the
+true value and regression line are minimized.
 
 ## Linear Regression
 The estimated response variable are expressed as the natural-log of the price. 
@@ -273,7 +276,11 @@ indicates a *good-fitted* model.
 fitted_lm$finalModel
 ```
 
-Looking at the coefficients we can see their interactions with the independent variable. Note that we predicted the log of price which result in smaller coefficient values, but this can be fixed by taking the exponential. We can see that the number of mileage greatly reduced the price of the vehicle while model makes such as Cadillac and SAAB increase the price. Noteably, Pontiac's are the worst model make for selling.
+Looking at the coefficients we can see their interactions with the independent variable. Note that 
+we predicted the log of price which result in smaller coefficient values, but this can be fixed by
+taking the exponential. We can see that the number of mileage greatly reduced the price of the 
+vehicle while model makes such as Cadillac and SAAB increase the price. Noteably, Pontiac's are the
+worst model make for selling.
 
 
 
