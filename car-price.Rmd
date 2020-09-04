@@ -1,0 +1,281 @@
+---
+title: "Car Price"
+author: "*Justin Gee*"
+output:
+  rmdformats::readthedown:
+    toc_depth: 3
+    self_contained: true
+  thumbnails: true
+  lightbox: true
+  gallery: false
+  highlight: tango
+  df_print: paged
+---
+
+# Abstract
+
+In this project, we will use Linear Regression to predict the price of a car 
+given its features.
+
+The metric used to determine *good-fit* of the model is Rsquared, which 
+determines the proportion of variability in the dependent variables that can 
+be explained by the independent variable.
+
+# The Data
+Load libraries used for this project
+```{r, echo = TRUE, eval=TRUE, warning = FALSE, message=FALSE}
+# Data manipulation and modeling
+library(dplyr)
+library(caret)
+library(readxl)
+library(leaps)
+
+# Visuals
+library(ggplot2)
+```
+
+Load dataset.
+```{r, echo=TRUE, eval=TRUE}
+car <- read_excel("car.xls")
+head(car, 2)
+```
+
+This is the data that we will be using for modeling. A few things to note:
+
+* There are 804 observations with 12 variables.
+* Categorical variables need to be converted to factors.
+
+Convert variables to appropriate datatypes.
+```{r, echo = TRUE, eval=TRUE}
+car$Leather <- as.factor(car$Leather)
+car$Price <- as.integer(car$Price)
+car$Sound <- as.factor(car$Sound)
+car$Make <- as.factor(car$Make)
+car$Cylinder <- as.factor(car$Cylinder)
+car$Doors <- as.factor(car$Doors)
+car$Cruise <- as.factor(car$Cruise)
+```
+
+# Analysis of the Data
+```{r, echo=TRUE, eval=TRUE}
+summary(car)
+```
+This table gives us summary statistics of each variable in nthe data. A few things to note:
+* Numerical variables, such as Price, and Mileage have left skewed data.
+  + Larger values need to be accounted for when modeling
+
+## Graphing of Features
+### Graph 1
+```{r, echo=TRUE, eval=TRUE}
+ggplot(car, aes(x = Mileage, y = Price)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  xlab("Mileage") +
+  ylab("Price") +
+  ggtitle("Price of Car by Mileage")
+```
+
+There is a negative correlation between the mileage of a car and its price.
+
+### Graph 2
+```{r, echo=TRUE, eval=TRUE}
+ggplot(car, aes(x = Make, y = Price, fill = Make)) + 
+  geom_boxplot(outlier.color = "red") + 
+  theme(legend.position = "none") +
+  xlab("Make") +
+  ylab("Price") +
+  ggtitle("Price Distribution by Make")
+```
+
+Cadillac has the largest distribution of prices, with cars costing as low as 
+about \$30,000 and cars costing upwards of \$70,000. Chevrolet has the most 
+outliers in these distributions. Saturn has the least variation and least 
+expensive cars, with all of them costing below $20,000.
+
+### Graph 3
+```{r, echo=TRUE, eval=TRUE}
+ggplot(car, aes(x = Cylinder, y = Price, fill = Make)) + 
+  geom_boxplot(outlier.color = "red") +
+  xlab("Number of Cylinders") +
+  ylab("Price") +
+  ggtitle("Price Distribution of Engine Cylinders")
+```
+
+The greatest distribution appears to be among Cadillacs with 8-cylinder 
+engines. This distribution has a multitude of outliers, all of them above the 
+price of \$60,000. Not all car makes use a certain type of cylinder engine. 
+Cadillac does not use 4-cylinder engines, Buick does not use 4-cylinder or 
+8-cylinder engines, SAAB does not use 6-cylinder or 8-cylinder engines, and 
+Saturn does not use 8-cylinder engines.
+
+### Graph 4
+```{r, echo=TRUE, eval=TRUE}
+ggplot(car, aes(x = Type, y = Price, fill = Type)) + 
+  geom_boxplot(outlier.color = "red") + 
+  theme(legend.position = "none") +
+  xlab("Type of Car") +
+  ylab("Price") +
+  ggtitle("Price Distribution of Car Types")
+```
+
+There is some disparity between types, the mean value of convertibles is the 
+highest among all types. Hatchbacks on average cost the least.
+
+### Graph 5
+```{r, echo=TRUE, eval=TRUE}
+ggplot(car, aes(x = Price, fill = Doors, color = Type)) +
+  geom_density(alpha = 0.3) +
+  xlab("Price") +
+  ylab("Density") + 
+  labs(subtitle = "Highlighted by Number of Doors") +
+  ggtitle("Price Distribution of Car Types")
+```
+
+Cars with two doors are priced higher than cars with four doors. This is due to
+the influence of convertible sports cars, which tend to have relatively high 
+prices compared to cars with 4 doors. 
+
+### Graph 6
+```{r, echo = TRUE, eval=TRUE}
+ggplot(car, aes(x = Sound, y = Price, fill = Sound)) + 
+  geom_boxplot(outlier.color = "red") + 
+  theme(legend.position = "none") +
+  scale_x_discrete(labels = c("0" = "No", "1" = "Yes")) +
+  xlab("Sound") +
+  ylab("Price") +
+  ggtitle("Price of Cars with or without Sound System")
+```
+
+Dispersion of prices are slightly greater for cars without upgraded speakers, 
+though there are many outliers among cars with upgraded speakers. Cars with 
+upgraded speakers are no more expensive than cars without upgraded speakers.
+
+### Graph 7
+```{r, echo=TRUE, eval=TRUE}
+ggplot(car, aes(x = Cruise, y = Price, fill = Make)) +
+  geom_boxplot(outlier.color = "red") +
+  scale_x_discrete(labels = c("0" = "No", "1" = "Yes")) +
+  xlab("Cruise Control") +
+  ylab("Price") +
+  ggtitle("Price of Cars with or without Cruise Control")
+```
+
+Saab, Buick, and Cadillac do not offer cars that have no cruise control. The 
+greatest variation in price is for Cadillacs that have cruise control. The 
+smallest variation are from Pontiacs that do not have cruise control. Cars 
+without cruise control goes for a price less than \$20,000, while a large 
+proportion of the cars that do go for more than \$20,000.
+
+# Preparing Data
+## Bayes Information Criterion (BIC Variable Selection)
+
+The BIC table ranks some of the best-fitting models given the set of predictors
+available in the data.
+```{r, echo = TRUE, eval=TRUE, warning=FALSE, message=FALSE, fig.height = 7, fig.width = 7}
+res = regsubsets(Price ~ Mileage + Make + Cylinder + Liter + Doors + Cruise + 
+                   Sound + Leather + Type, data = car, nbest = 3, 
+                 method = "exhaustive", really.big = T)
+par(cex.axis = 1, cex.lab = 1)
+plot(res, scale = "bic")
+```
+
+The best-fitting by BIC includes mileage, make, the 
+number of cylinders, liters, the number of doors, and type of car. The table 
+excludes cruise control, upgraded sound, and leather. To reduce the model 
+complexity for this model, we will also exclude the number of doors and 
+cylinders. 
+
+## Train and Test Sets
+```{r, echo=TRUE, eval=TRUE}
+set.seed(444)
+
+data <- car %>%
+  select(-c(Model, Trim, Cylinder, Doors, Cruise, Sound, Leather))
+data$Price <- log(data$Price)
+colnames(data) <- make.names(colnames(data))
+
+train_ind <- createDataPartition(y = data$Price, p = 0.8, list = FALSE)
+
+training <- data[train_ind,]
+testing <- data[-train_ind,]
+```
+
+# Modeling
+## The Math behind the Metrics
+
+$R^2$ is defined as:
+
+* $R^2 = 1 - \frac{SS_R}{SS_T}$
+* $[0 \leq R^2 \leq 1]$
+* Where:
+  + $SS_R = \sum_{i}{(y_i - \hat{y_i})^2} = \sum_i{e_i^2}$ = Residual Sum of Squares
+  + $SS_T = \sum_{i}{(y_i - \bar{y})^2}$ = Total Sum of Squares
+
+$R^2$ is the proportion of the variance in the dependent variable that is predictable from the independent variable. As residuals become smaller, the more accurate the model becomes. When using $R^2$ we want to achieve a value closest to 1.
+
+## Notes
+Linear Regression:
+
+* $\hat{y} = \beta_0 + \beta_1{x_1} + \beta_2{x_2} + ... + \beta_n{x_n}$
+* Where:
+  + $\hat{y}$ = predicted value
+  + $\beta_0$ = intercept
+  + $x$ = dependent variable
+  
+In order to solve for $\beta$ we use Ordinary Least Squares, where the squared distance between the true value and regression line are minimized.
+
+## Linear Regression
+The estimated response variable are expressed as the natural-log of the price. 
+```{r, echo=TRUE, eval=TRUE}
+lm_ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
+fitted_lm <- train(Price~., data=training, 
+                   trControl = lm_ctrl,
+                   method = "lm",
+                   metric = "Rsquared")
+```
+
+## Model evaluation
+### Graph 1
+```{r, echo=TRUE, eval=TRUE}
+plot(fitted_lm$finalModel, which=c(1,1))
+```
+
+The residual plot of the transformed model shows that there are constant 
+variances. This can be shown by the "random" pattern that appears in the plot. 
+The randomness indicates that as fitted value increases, the deviation of the 
+residuals stays constant or relatively constant. The transformation fixes the 
+non-constant variances that appeared at higher fitted values.
+
+### Graph 2
+```{r, echo=TRUE, eval=TRUE}
+plot(fitted_lm$finalModel, which=c(2,2))
+```
+
+Transforming the model by using the natural-log of the response variable makes 
+the Q-Q plot more normal.
+
+The assumptions of linear regression are fulfilled.
+
+# Conclusions
+Using the model above, we can test its effectiveness by predicting our test set.
+```{r}
+predict_lm <- predict(fitted_lm, testing)
+R2(predict_lm, testing$Price)
+```
+
+Using the fitted linear model, the Rsquared value on the testing data is 
+0.9602989. 
+
+Based on the results of the training and testing, the Rsquared metric 
+indicates a *good-fitted* model.
+
+```{r}
+fitted_lm$finalModel
+```
+
+Looking at the coefficients we can see their interactions with the independent variable. Note that we predicted the log of price which result in smaller coefficient values, but this can be fixed by taking the exponential. We can see that the number of mileage greatly reduced the price of the vehicle while model makes such as Cadillac and SAAB increase the price. Noteably, Pontiac's are the worst model make for selling.
+
+
+
+
+
